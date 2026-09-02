@@ -62,6 +62,14 @@ public interface TmsTestCaseService {
       MultipartFile file
   );
 
+  List<TmsTestFolderRS> importFromFile(
+      MembershipDetails membershipDetails,
+      ReportPortalUser user,
+      Long testFolderId,
+      String testFolderName,
+      MultipartFile file
+  );
+
   void exportToFile(Long projectId, List<Long> ids, String format, boolean includeAttachments,
       HttpServletResponse response);
 

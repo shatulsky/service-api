@@ -23,7 +23,7 @@ import com.epam.reportportal.base.infrastructure.persistence.entity.activity.Act
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventAction;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventObject;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventPriority;
-import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventSubject;
+import com.epam.reportportal.base.ws.rabbit.activity.util.ActivityDetailsUtil;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -40,9 +40,9 @@ public class TestCaseCreatedEventConverter implements EventToActivityConverter<T
         .addObjectName(event.getAfter().getName())
         .addObjectType(EventObject.TMS_TEST_CASE)
         .addProjectId(event.getAfter().getProjectId())
-        .addSubjectId(event.getUserId())
-        .addSubjectName(event.getUserLogin())
-        .addSubjectType(EventSubject.USER)
+        .addSubjectId(ActivityDetailsUtil.getSubjectId(event))
+        .addSubjectName(ActivityDetailsUtil.getSubjectName(event))
+        .addSubjectType(ActivityDetailsUtil.getSubjectType(event))
         .addOrganizationId(event.getOrganizationId())
         .get();
   }

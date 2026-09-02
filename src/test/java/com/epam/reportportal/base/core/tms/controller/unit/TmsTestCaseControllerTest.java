@@ -759,7 +759,8 @@ public class TmsTestCaseControllerTest {
     var file = new MockMultipartFile("file", "test.csv", "text/csv", "test,case,data".getBytes());
     var testFolderId = 3L;
     var importResult = List.of(new TmsTestFolderRS());
-    given(tmsTestCaseService.importFromFile(eq(projectId), eq(testFolderId), eq(null), eq(file)))
+    given(tmsTestCaseService.importFromFile(
+        eq(membershipDetails), eq(testUser), eq(testFolderId), eq(null), eq(file)))
         .willReturn(importResult);
   
     mockMvc.perform(
@@ -770,7 +771,8 @@ public class TmsTestCaseControllerTest {
         .andExpect(status().isOk());
   
     verify(projectExtractor).extractMembershipDetails(eq(testUser), anyString());
-    verify(tmsTestCaseService).importFromFile(eq(projectId), eq(testFolderId), eq(null), eq(file));
+    verify(tmsTestCaseService).importFromFile(
+        eq(membershipDetails), eq(testUser), eq(testFolderId), eq(null), eq(file));
   }
   
   @Test
@@ -778,7 +780,8 @@ public class TmsTestCaseControllerTest {
     var file = new MockMultipartFile("file", "test.csv", "text/csv", "test,case,data".getBytes());
     var testFolderName = "Test Folder";
     var importResult = List.of(new TmsTestFolderRS());
-    given(tmsTestCaseService.importFromFile(eq(projectId), eq(null), eq(testFolderName), eq(file)))
+    given(tmsTestCaseService.importFromFile(
+        eq(membershipDetails), eq(testUser), eq(null), eq(testFolderName), eq(file)))
         .willReturn(importResult);
   
     mockMvc.perform(
@@ -789,15 +792,16 @@ public class TmsTestCaseControllerTest {
         .andExpect(status().isOk());
   
     verify(projectExtractor).extractMembershipDetails(eq(testUser), anyString());
-    verify(tmsTestCaseService).importFromFile(eq(projectId), eq(null), eq(testFolderName),
-        eq(file));
+    verify(tmsTestCaseService).importFromFile(
+        eq(membershipDetails), eq(testUser), eq(null), eq(testFolderName), eq(file));
   }
   
   @Test
   void importTestCasesWithoutFolderParametersTest() throws Exception {
     var file = new MockMultipartFile("file", "test.csv", "text/csv", "test,case,data".getBytes());
     var importResult = List.of(new TmsTestFolderRS());
-    given(tmsTestCaseService.importFromFile(eq(projectId), eq(null), eq(null), eq(file)))
+    given(tmsTestCaseService.importFromFile(
+        eq(membershipDetails), eq(testUser), eq(null), eq(null), eq(file)))
         .willReturn(importResult);
   
     mockMvc.perform(
@@ -807,7 +811,8 @@ public class TmsTestCaseControllerTest {
         .andExpect(status().isOk());
   
     verify(projectExtractor).extractMembershipDetails(eq(testUser), anyString());
-    verify(tmsTestCaseService).importFromFile(eq(projectId), eq(null), eq(null), eq(file));
+    verify(tmsTestCaseService).importFromFile(
+        eq(membershipDetails), eq(testUser), eq(null), eq(null), eq(file));
   }
   
   @Test
@@ -817,7 +822,7 @@ public class TmsTestCaseControllerTest {
     var testFolderName = "Test Folder";
     var importResult = List.of(new TmsTestFolderRS());
     given(tmsTestCaseService.importFromFile(
-        eq(projectId), eq(testFolderId), eq(testFolderName), eq(file)))
+        eq(membershipDetails), eq(testUser), eq(testFolderId), eq(testFolderName), eq(file)))
         .willReturn(importResult);
 
     mockMvc.perform(
@@ -830,7 +835,7 @@ public class TmsTestCaseControllerTest {
 
     verify(projectExtractor).extractMembershipDetails(eq(testUser), anyString());
     verify(tmsTestCaseService).importFromFile(
-        eq(projectId), eq(testFolderId), eq(testFolderName), eq(file));
+        eq(membershipDetails), eq(testUser), eq(testFolderId), eq(testFolderName), eq(file));
   }
 
   @Test

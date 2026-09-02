@@ -1,8 +1,10 @@
 package com.epam.reportportal.base.core.tms.sync.service;
 
+import com.epam.reportportal.base.core.events.domain.AbstractEvent;
 import com.epam.reportportal.base.core.tms.dto.TmsTestCaseAttributeRQ;
 import com.epam.reportportal.base.core.tms.mapper.TmsAttachmentMapper;
 import com.epam.reportportal.base.core.tms.mapper.TmsManualScenarioMapper;
+import com.epam.reportportal.base.core.tms.mapper.TmsTestCaseActivityResourceMapper;
 import com.epam.reportportal.base.core.tms.mapper.TmsTestCaseMapper;
 import com.epam.reportportal.base.core.tms.service.TmsTestCaseAttributeService;
 import com.epam.reportportal.base.core.tms.service.TmsTestCaseVersionService;
@@ -16,9 +18,10 @@ import com.epam.reportportal.base.infrastructure.persistence.dao.tms.TmsTestCase
 import com.epam.reportportal.base.infrastructure.persistence.entity.integration.Integration;
 import com.epam.reportportal.base.infrastructure.persistence.entity.tms.TmsAttachment;
 import com.epam.reportportal.base.infrastructure.persistence.entity.tms.TmsTestCase;
+import com.epam.reportportal.base.infrastructure.persistence.entity.tms.TmsTestCaseVersion;
 import com.epam.reportportal.base.infrastructure.persistence.entity.tms.sync.SyncError;
+import com.epam.reportportal.base.model.activity.TestCaseActivityResource;
 import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +31,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -46,6 +51,8 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
   private final TmsTestCaseMapper tmsTestCaseMapper;
   private final TmsAttachmentMapper tmsAttachmentMapper;
   private final TmsManualScenarioMapper tmsManualScenarioMapper;
+  private final TmsTestCaseActivityResourceMapper tmsTestCaseActivityResourceMapper;
+  private final ApplicationEventPublisher eventPublisher;
   private final TransactionTemplate transactionTemplate;
 
   public TmsTestCaseSyncServiceImpl(
@@ -58,6 +65,8 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
       TmsTestCaseMapper tmsTestCaseMapper,
       TmsAttachmentMapper tmsAttachmentMapper,
       TmsManualScenarioMapper tmsManualScenarioMapper,
+      TmsTestCaseActivityResourceMapper tmsTestCaseActivityResourceMapper,
+      ApplicationEventPublisher eventPublisher,
       PlatformTransactionManager transactionManager) {
     this.tmsTestCaseRepository = tmsTestCaseRepository;
     this.tmsTestCaseVersionService = tmsTestCaseVersionService;
@@ -68,6 +77,8 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
     this.tmsTestCaseMapper = tmsTestCaseMapper;
     this.tmsAttachmentMapper = tmsAttachmentMapper;
     this.tmsManualScenarioMapper = tmsManualScenarioMapper;
+    this.tmsTestCaseActivityResourceMapper = tmsTestCaseActivityResourceMapper;
+    this.eventPublisher = eventPublisher;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -92,6 +103,22 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
                 Collectors.toMap(TmsTestCase::getExternalId, Function.identity())
             )
     );
+
+    var existingIds = existingTestCases != null
+        ? existingTestCases.values().stream().map(TmsTestCase::getId).toList()
+        : List.<Long>of();
+    var beforeVersions = !existingIds.isEmpty()
+        ? transactionTemplate.execute(status -> tmsTestCaseVersionService.getDefaultVersions(existingIds))
+        : Map.<Long, TmsTestCaseVersion>of();
+
+    var beforeMap = new HashMap<String, TestCaseActivityResource>();
+    if (existingTestCases != null) {
+      for (var entry : existingTestCases.entrySet()) {
+        var existingTc = entry.getValue();
+        var defaultVersion = beforeVersions != null ? beforeVersions.get(existingTc.getId()) : null;
+        beforeMap.put(entry.getKey(), tmsTestCaseActivityResourceMapper.buildActivityResource(existingTc, defaultVersion));
+      }
+    }
 
     var testCaseSyncContext = new TestCaseSyncContext(
         projectId, connector, integration, localFolderId
@@ -133,7 +160,11 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
     // 3. Save Batch (Short DB Write Transaction)
     final var finalProcessedCount = processedCount;
     final var finalFailedCount = failedCount;
-    transactionTemplate.execute(status -> {
+    var orgId = integration != null
+        ? (integration.getProject() != null ? integration.getProject().getOrganizationId() : integration.getOrganizationId())
+        : null;
+
+    var resultPair = transactionTemplate.execute(status -> {
       var allAttachments = attachmentsByTestCaseId
           .values()
           .stream()
@@ -142,6 +173,8 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
       if (!allAttachments.isEmpty()) {
         tmsAttachmentRepository.saveAll(allAttachments);
       }
+
+      var eventsToPublish = new ArrayList<AbstractEvent<?>>();
 
       if (!testCasesToSave.isEmpty()) {
         var savedTestCases = tmsTestCaseRepository.saveAll(testCasesToSave);
@@ -173,9 +206,14 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
                   .toList();
               var manualScenarioRQ = tmsManualScenarioMapper.convertFromRemote(remoteTestCase, attachmentIds);
               if (isTestCaseNew) {
-                tmsTestCaseVersionService.createDefaultTestCaseVersion(projectId, tmsTestCase, manualScenarioRQ);
+                var defaultVersion = tmsTestCaseVersionService.createDefaultTestCaseVersion(projectId, tmsTestCase, manualScenarioRQ);
+                var after = tmsTestCaseActivityResourceMapper.buildActivityResource(tmsTestCase, defaultVersion);
+                eventsToPublish.add(tmsTestCaseActivityResourceMapper.buildTestCaseCreatedEvent(orgId, null, null, after));
               } else {
-                tmsTestCaseVersionService.updateDefaultTestCaseVersion(projectId, tmsTestCase, manualScenarioRQ);
+                var defaultVersion = tmsTestCaseVersionService.updateDefaultTestCaseVersion(projectId, tmsTestCase, manualScenarioRQ);
+                var after = tmsTestCaseActivityResourceMapper.buildActivityResource(tmsTestCase, defaultVersion);
+                var before = beforeMap.get(remoteTestCase.getId());
+                eventsToPublish.addAll(tmsTestCaseActivityResourceMapper.buildTestCaseFieldChangedEvents(orgId, null, null, before, after));
               }
             }
           }
@@ -188,8 +226,13 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
       if (!errors.isEmpty()) {
         job.getErrorLog().getErrors().addAll(errors);
       }
-      return tmsSyncJobRepository.save(job);
+      var savedJob = tmsSyncJobRepository.save(job);
+      return Pair.of(savedJob, eventsToPublish);
     });
+
+    if (resultPair != null && resultPair.getRight() != null) {
+      resultPair.getRight().forEach(eventPublisher::publishEvent);
+    }
   }
 
   private TestCaseSyncResult processTestCase(
@@ -271,6 +314,7 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
         || contentType.equalsIgnoreCase("image/png")
         || contentType.equalsIgnoreCase("image/jpg"));
   }
+
 
   private record TestCaseSyncContext(
       Long projectId,
