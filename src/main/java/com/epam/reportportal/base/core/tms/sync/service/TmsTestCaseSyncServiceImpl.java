@@ -17,6 +17,7 @@ import com.epam.reportportal.base.infrastructure.persistence.entity.integration.
 import com.epam.reportportal.base.infrastructure.persistence.entity.tms.TmsAttachment;
 import com.epam.reportportal.base.infrastructure.persistence.entity.tms.TmsTestCase;
 import com.epam.reportportal.base.infrastructure.persistence.entity.tms.sync.SyncError;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -241,9 +242,21 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
           .replaceAll("[^a-zA-Z0-9.-]", "_");
       var shardedPath = String.format("tms/%d/%s/%s_%s",
           context.projectId(), remoteTestCase.getId(), remoteAttachment.getId(), sanitizedFilename);
-
-      var fileId = tmsAttachmentDataStoreService.save(shardedPath, inputStream);
-      return tmsAttachmentMapper.convertFromRemote(remoteAttachment, fileId);
+      var bytes = inputStream.readAllBytes();
+      var fileId = tmsAttachmentDataStoreService.save(shardedPath, new ByteArrayInputStream(bytes));
+      String thumbnailId = null;
+      if (isImage(remoteAttachment.getMimeType())) {
+        try {
+          var thumbnailShardedPath = String.format("tms/%d/%s/thumbnail_%s_%s",
+              context.projectId(), remoteTestCase.getId(), remoteAttachment.getId(), sanitizedFilename);
+          thumbnailId = tmsAttachmentDataStoreService.saveThumbnail(
+              thumbnailShardedPath, new ByteArrayInputStream(bytes));
+        } catch (Exception e) {
+          log.warn("Failed to create thumbnail for attachment {} in test case {}",
+              remoteAttachment.getId(), remoteTestCase.getId(), e);
+        }
+      }
+      return tmsAttachmentMapper.convertFromRemote(remoteAttachment, fileId, thumbnailId);
     } catch (Exception e) {
       log.warn("Failed to sync attachment {} for test case {}", remoteAttachment.getId(),
           remoteTestCase.getId(), e);
@@ -253,6 +266,11 @@ public class TmsTestCaseSyncServiceImpl implements TmsTestCaseSyncService {
     }
   }
 
+  private boolean isImage(String contentType) {
+    return contentType != null && (contentType.equalsIgnoreCase("image/jpeg")
+        || contentType.equalsIgnoreCase("image/png")
+        || contentType.equalsIgnoreCase("image/jpg"));
+  }
 
   private record TestCaseSyncContext(
       Long projectId,

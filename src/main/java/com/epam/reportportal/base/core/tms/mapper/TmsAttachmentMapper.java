@@ -51,7 +51,7 @@ public abstract class TmsAttachmentMapper {
   @Mapping(target = "fileType", source = "remoteAttachment.mimeType")
   @Mapping(target = "fileSize", source = "remoteAttachment.size")
   @Mapping(target = "pathToFile", source = "fileId")
-  @Mapping(target = "thumbnailPath", ignore = true)
+  @Mapping(target = "thumbnailPath", source = "thumbnailPath")
   @Mapping(target = "expiresAt", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "textManualScenarios", ignore = true)
@@ -59,5 +59,5 @@ public abstract class TmsAttachmentMapper {
   @Mapping(target = "manualScenarioPreconditions", ignore = true)
   @Mapping(target = "executionComments", ignore = true)
   @Mapping(target = "environment", ignore = true)
-  public abstract TmsAttachment convertFromRemote(RemoteAttachment remoteAttachment, String fileId);
+  public abstract TmsAttachment convertFromRemote(RemoteAttachment remoteAttachment, String fileId, String thumbnailPath);
 }
