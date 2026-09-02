@@ -21,8 +21,8 @@ import com.epam.reportportal.base.infrastructure.persistence.builder.ActivityBui
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.Activity;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventObject;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventPriority;
+import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventSubject;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.HistoryField;
-import com.epam.reportportal.base.ws.rabbit.activity.util.ActivityDetailsUtil;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -48,9 +48,9 @@ public class TestCaseFieldChangedEventConverter implements EventToActivityConver
         .addObjectName(event.getAfter().getName())
         .addObjectType(EventObject.TMS_TEST_CASE)
         .addProjectId(event.getAfter().getProjectId())
-        .addSubjectId(ActivityDetailsUtil.getSubjectId(event))
-        .addSubjectName(ActivityDetailsUtil.getSubjectName(event))
-        .addSubjectType(ActivityDetailsUtil.getSubjectType(event))
+        .addSubjectId(event.getUserId())
+        .addSubjectName(event.getUserLogin())
+        .addSubjectType(EventSubject.USER)
         .addOrganizationId(event.getOrganizationId())
         .addHistoryField(Optional.of(historyField))
         .get();

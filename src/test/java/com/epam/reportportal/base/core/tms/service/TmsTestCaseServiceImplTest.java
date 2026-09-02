@@ -1078,47 +1078,6 @@ class TmsTestCaseServiceImplTest {
   }
 
   @Test
-  void importFromFile_WithMembershipDetailsAndUser_ShouldPublishCreatedEvent() {
-    when(membershipDetails.getProjectId()).thenReturn(projectId);
-
-    var file = new MockMultipartFile("test.csv", "test.csv", "text/csv", "content".getBytes());
-
-    var importRQ = new TmsTestCaseImportRQ();
-    importRQ.setName("Test Case 1");
-    importRQ.setFolderPath(null);
-
-    var parseResult = TmsTestCaseImportParseResult.builder()
-        .testCases(List.of(importRQ))
-        .totalRows(1)
-        .build();
-
-    var savedTestCase = new TmsTestCase();
-    savedTestCase.setId(100L);
-
-    when(importerFactory.getImporter("test.csv")).thenReturn(importer);
-    when(importer.parse(any(InputStream.class))).thenReturn(parseResult);
-    when(tmsTestFolderService.existsById(projectId, testFolderId)).thenReturn(true);
-    when(tmsTestFolderService.resolveFolderPathsBatch(eq(projectId), eq(testFolderId), anyList()))
-        .thenReturn(Collections.emptyMap());
-    when(tmsAttributeService.resolveAttributes(eq(projectId), anySet()))
-        .thenReturn(Collections.emptyMap());
-    when(tmsTestCaseMapper.convertFromImportRQ(eq(projectId), eq(importRQ), eq(testFolderId)))
-        .thenReturn(savedTestCase);
-    when(tmsTestCaseRepository.saveAll(anyList())).thenReturn(List.of(savedTestCase));
-    when(tmsTestFolderService.getFoldersWithCountByIds(eq(projectId), any()))
-        .thenReturn(List.of(new TmsTestFolderRS()));
-
-    var result = sut.importFromFile(membershipDetails, user, testFolderId, null, file);
-
-    assertNotNull(result);
-    assertEquals(1, result.size());
-    verify(importerFactory).getImporter("test.csv");
-    verify(importer).parse(any(InputStream.class));
-    verify(tmsTestCaseRepository).saveAll(anyList());
-    verify(eventPublisher).publishEvent(any(TestCaseCreatedEvent.class));
-  }
-
-  @Test
   void importFromFile_WithValidData_ShouldReturnImportResult() {
     var file = new MockMultipartFile("test.csv", "test.csv", "text/csv", "content".getBytes());
 

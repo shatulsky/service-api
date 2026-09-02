@@ -34,21 +34,14 @@ public abstract class TmsTestCaseActivityResourceMapper {
     if (tc == null) {
       return null;
     }
-    Long testFolderId = tc.getTestFolder() != null ? tc.getTestFolder().getId() : null;
-    Long projectId = tc.getProject() != null
-        ? tc.getProject().getId()
-        : (tc.getTestFolder() != null && tc.getTestFolder().getProject() != null
-            ? tc.getTestFolder().getProject().getId()
-            : null);
-
     var builder = TestCaseActivityResource.builder()
         .id(tc.getId())
-        .projectId(projectId)
+        .projectId(tc.getTestFolder().getProject().getId())
         .name(tc.getName())
         .description(tc.getDescription())
         .priority(tc.getPriority())
         .externalId(tc.getExternalId())
-        .testFolderId(testFolderId)
+        .testFolderId(tc.getTestFolder().getId())
         .build();
 
     mapTags(builder, tc);
@@ -142,42 +135,23 @@ public abstract class TmsTestCaseActivityResourceMapper {
       ReportPortalUser user,
       TestCaseActivityResource before,
       TestCaseActivityResource after) {
-    Long orgId = membershipDetails != null ? membershipDetails.getOrgId() : null;
-    Long userId = user != null ? user.getUserId() : null;
-    String username = user != null ? user.getUsername() : null;
-    return buildTestCaseFieldChangedEvents(orgId, userId, username, before, after);
-  }
-
-  public List<TestCaseFieldChangedEvent> buildTestCaseFieldChangedEvents(
-      Long orgId,
-      Long userId,
-      String username,
-      TestCaseActivityResource before,
-      TestCaseActivityResource after) {
+  
     return tmsTestCaseFieldProcessors
         .stream()
         .map(processor -> processor.process(before, after))
         .filter(Optional::isPresent)
         .map(Optional::get)
-        .peek(event -> event.setContext(userId, username, orgId))
+        .peek(event -> event.setContext(user.getUserId(), user.getUsername(), membershipDetails.getOrgId()))
         .collect(Collectors.toList());
   }
 
   public TestCaseCreatedEvent buildTestCaseCreatedEvent(MembershipDetails membershipDetails,
       ReportPortalUser user, TestCaseActivityResource testCaseActivityResource) {
-    Long orgId = membershipDetails != null ? membershipDetails.getOrgId() : null;
-    Long userId = user != null ? user.getUserId() : null;
-    String username = user != null ? user.getUsername() : null;
-    return buildTestCaseCreatedEvent(orgId, userId, username, testCaseActivityResource);
-  }
-
-  public TestCaseCreatedEvent buildTestCaseCreatedEvent(Long orgId, Long userId, String username,
-      TestCaseActivityResource testCaseActivityResource) {
     return new TestCaseCreatedEvent(
         testCaseActivityResource,
-        userId,
-        username,
-        orgId
+        user.getUserId(),
+        user.getUsername(),
+        membershipDetails.getOrgId()
     );
   }
 }

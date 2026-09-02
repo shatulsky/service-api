@@ -295,11 +295,10 @@ public class TestCaseController {
       @RequestParam(value = "testFolderId", required = false) Long testFolderId,
       @RequestParam(value = "testFolderName", required = false) String testFolderName,
       @AuthenticationPrincipal ReportPortalUser user) {
-    var membershipDetails = projectExtractor
-        .extractMembershipDetails(user, EntityUtils.normalizeId(projectKey));
     return tmsTestCaseService.importFromFile(
-        membershipDetails,
-        user,
+        projectExtractor
+            .extractMembershipDetails(user, EntityUtils.normalizeId(projectKey))
+            .getProjectId(),
         testFolderId,
         testFolderName,
         file

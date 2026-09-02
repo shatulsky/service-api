@@ -24,7 +24,6 @@ import com.epam.reportportal.base.infrastructure.persistence.entity.activity.Eve
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventObject;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventPriority;
 import com.epam.reportportal.base.infrastructure.persistence.entity.activity.EventSubject;
-import com.epam.reportportal.base.ws.rabbit.activity.util.ActivityDetailsUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
@@ -42,9 +41,9 @@ public class TestCaseDeletedEventConverter implements EventToActivityConverter<T
         .addObjectName(String.valueOf(event.getBefore().getId())) //name is not available in test case deleted event, but required for the db schema
         .addObjectType(EventObject.TMS_TEST_CASE)
         .addProjectId(event.getBefore().getProjectId())
-        .addSubjectId(ActivityDetailsUtil.getSubjectId(event))
-        .addSubjectName(ActivityDetailsUtil.getSubjectName(event))
-        .addSubjectType(ActivityDetailsUtil.getSubjectType(event))
+        .addSubjectId(event.getUserId())
+        .addSubjectName(event.getUserLogin())
+        .addSubjectType(EventSubject.USER)
         .addOrganizationId(event.getOrganizationId())
         .get();
   }

@@ -346,29 +346,6 @@ public class TmsTestCaseServiceImpl implements TmsTestCaseService {
   @Override
   @Transactional
   public List<TmsTestFolderRS> importFromFile(
-      MembershipDetails membershipDetails,
-      ReportPortalUser user,
-      Long testFolderId,
-      String testFolderName,
-      MultipartFile file) {
-    return importFromFileInternal(
-        membershipDetails, user, membershipDetails.getProjectId(), testFolderId, testFolderName, file
-    );
-  }
-
-  @Override
-  @Transactional
-  public List<TmsTestFolderRS> importFromFile(
-      long projectId,
-      Long testFolderId,
-      String testFolderName,
-      MultipartFile file) {
-    return importFromFileInternal(null, null, projectId, testFolderId, testFolderName, file);
-  }
-
-  private List<TmsTestFolderRS> importFromFileInternal(
-      MembershipDetails membershipDetails,
-      ReportPortalUser user,
       long projectId,
       Long testFolderId,
       String testFolderName,
@@ -402,7 +379,7 @@ public class TmsTestCaseServiceImpl implements TmsTestCaseService {
     validateFolderAssignment(preparationResult.getPreparedTestCases());
 
     // 7. Batch create all test cases
-    importTestCases(membershipDetails, user, projectId, preparationResult.getPreparedTestCases(),
+    importTestCases(projectId, preparationResult.getPreparedTestCases(),
         keyToAttributeId);
     
     return tmsTestFolderService.getFoldersWithCountByIds(projectId, affectedFolderIds);
@@ -483,8 +460,6 @@ public class TmsTestCaseServiceImpl implements TmsTestCaseService {
   }
 
   private List<Long> importTestCases(
-      MembershipDetails membershipDetails,
-      ReportPortalUser user,
       long projectId,
       List<PreparedTestCase> preparedTestCases,
       Map<String, Long> keyToAttributeId) {
@@ -509,10 +484,8 @@ public class TmsTestCaseServiceImpl implements TmsTestCaseService {
             keyToAttributeId);
       }
 
-      var defaultVersion = tmsTestCaseVersionService.createDefaultTestCaseVersion(projectId, savedTestCase,
+      tmsTestCaseVersionService.createDefaultTestCaseVersion(projectId, savedTestCase,
           importRQ.getManualScenario());
-
-      publishTestCaseCreatedEvent(membershipDetails, user, savedTestCase, defaultVersion);
     }
 
     return savedTestCases
